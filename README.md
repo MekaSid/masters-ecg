@@ -1,0 +1,145 @@
+# ECG TDA Robustness
+
+Initial codebase for studying how persistent-homology-based ECG arrhythmia classification behaves under realistic noise from the MIT-BIH Noise Stress Test Database.
+
+## Research Goal
+
+The eventual comparison is:
+
+- Raw ECG model
+- Persistent Homology / TDA model
+- Raw ECG + Persistent Homology fusion model
+
+All approaches are intended to train on clean MIT-BIH Arrhythmia Database beats and be evaluated under increasing NSTDB noise.
+
+This milestone implements the shared data, preprocessing, noise, and TDA pipeline needed before model training.
+
+## Datasets
+
+- MIT-BIH Arrhythmia Database (`mitdb`)
+- MIT-BIH Noise Stress Test Database (`nstdb`)
+
+Data access is handled with `wfdb` and stored locally under `data/raw/`.
+
+## Repository Layout
+
+```text
+configs/         YAML configuration for data and TDA parameters
+data/            Raw, processed, and TDA-derived artifacts
+notebooks/       Lightweight exploration notebooks
+scripts/         CLI entrypoints for download, preprocessing, noise, TDA, and smoke tests
+src/             Reusable project code
+tests/           Lightweight unit tests for core pipeline steps
+results/         Figures and diagnostic outputs
+```
+
+## Installation
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Download Data
+
+```bash
+python3 scripts/download_data.py
+```
+
+This downloads:
+
+- `mitdb`, defaulting to record `100` for the first smoke test
+- `nstdb` noise records `bw`, `ma`, and `em`
+
+## Preprocess MIT-BIH Beats
+
+```bash
+python3 scripts/preprocess_mitdb.py --records 100
+```
+
+This extracts fixed-length heartbeat windows around annotated beats, preserves original symbols, maps labels into AAMI-style classes, and saves:
+
+- beat metadata to `data/processed/clean/*.csv`
+- waveform arrays to `data/processed/clean/*.npz`
+
+## Run TDA Pipeline
+
+```bash
+python3 scripts/compute_tda.py --record 100 --beat-index 0
+```
+
+This computes:
+
+- delay embeddings
+- H0/H1 persistence diagrams
+- persistence images
+
+## End-to-End Smoke Test
+
+```bash
+python3 scripts/test_pipeline.py --record 100 --noise-type ma --snr-db 12
+```
+
+The smoke test:
+
+1. Loads MIT-BIH record `100`
+2. Loads annotations
+3. Extracts one valid heartbeat
+4. Maps its label
+5. Loads NSTDB noise
+6. Generates a noisy version at the requested SNR
+7. Computes delay embeddings for clean and noisy beats
+8. Computes H0/H1 persistence diagrams
+9. Generates persistence images
+10. Computes bottleneck and Wasserstein distances
+11. Saves diagnostic plots under `results/`
+
+## Configuration
+
+Main settings live in:
+
+- `configs/data.yaml`
+- `configs/tda.yaml`
+
+These control beat windowing, dataset paths, record splits, noise settings, embedding parameters, and persistence image settings.
+
+## Label Mapping
+
+Detailed MIT-BIH beat symbols are mapped centrally in `src/data/labels.py` into AAMI-style classes:
+
+- `N`: `N`, `L`, `R`, `e`, `j`
+- `S`: `A`, `a`, `J`, `S`
+- `V`: `V`, `E`
+- `F`: `F`
+- `Q`: `/`, `f`, `Q`, `|`, `~`, `!`, `+`, `[`, `]`, `"`, `x`
+
+The original annotation symbol is retained in processed metadata alongside the mapped class.
+
+## Current Status
+
+Implemented:
+
+- Repository structure
+- Data download and loading
+- Beat extraction and label mapping
+- Record-based split configuration
+- NSTDB noise loading and SNR-based corruption
+- Delay embedding and persistent homology computation
+- Persistence image generation
+- Diagram distance utilities
+- End-to-end smoke-test script
+- Lightweight tests
+
+Not implemented yet:
+
+- Full raw ECG deep-learning training
+- TDA classifier training
+- Fusion model training
+- Formal train/validation/test experiment runner
+
+## Notes
+
+- Splitting is record-driven by configuration; beats are not randomly split by default.
+- Persistence image fitting is currently local to the input diagrams for smoke testing. For formal experiments it should be fit on training data only and reused for validation/test data.
+- Large datasets and generated artifacts are excluded from Git via `.gitignore`.

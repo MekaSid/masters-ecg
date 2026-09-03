@@ -1,0 +1,19 @@
+tda:
+  embedding_dimension: 3
+  delay: 5
+  stride: 1
+  max_homology_dimension: 1
+  thresh: null
+
+persistence_image:
+  pixel_size: 0.1
+  birth_range:
+    - 0.0
+    - 2.0
+  pers_range:
+    - 0.0
+    - 2.0
+  weight:
+    type: linear_ramp
+    low: 0.0
+    high: 1.0

@@ -1,0 +1,54 @@
+project:
+  seed: 42
+
+paths:
+  raw_dir: data/raw
+  mitdb_dir: data/raw/mitdb
+  nstdb_dir: data/raw/nstdb
+  processed_clean_dir: data/processed/clean
+  processed_noisy_dir: data/processed/noisy
+  tda_diagrams_dir: data/tda/diagrams
+  persistence_images_dir: data/tda/persistence_images
+  results_dir: results
+
+data:
+  sampling_rate: 360
+  beat_window:
+    pre_samples: 128
+    post_samples: 128
+  allowed_channels:
+    - 0
+  mitdb_records:
+    - "100"
+  nstdb_records:
+    - "bw"
+    - "ma"
+    - "em"
+
+labels:
+  unknown_class: Q
+
+splits:
+  train_records:
+    - "101"
+    - "106"
+    - "108"
+  val_records:
+    - "109"
+  test_records:
+    - "100"
+
+noise:
+  seed: 42
+  default_type: ma
+  types:
+    - bw
+    - ma
+    - em
+  snr_levels:
+    - 24
+    - 18
+    - 12
+    - 6
+    - 0
+    - -6
