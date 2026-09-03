@@ -5,7 +5,6 @@ from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-from persim import plot_diagrams
 
 
 def save_waveform_plot(
@@ -50,9 +49,25 @@ def save_embedding_plot(
     plt.close(fig)
 
 
-def save_diagram_plot(diagrams: list[np.ndarray], output_path: Path, title: str) -> None:
+def save_diagram_plot(diagrams: dict[int, np.ndarray], output_path: Path, title: str) -> None:
     fig, ax = plt.subplots(figsize=(6, 6))
-    plot_diagrams(diagrams, ax=ax, title=title, show=False)
+    finite_max = 1.0
+    for dim, diagram in diagrams.items():
+        if diagram.size == 0:
+            continue
+        finite = diagram[np.isfinite(diagram).all(axis=1)]
+        if finite.size == 0:
+            continue
+        finite_max = max(finite_max, float(np.max(finite)))
+        ax.scatter(finite[:, 0], finite[:, 1], s=16, alpha=0.8, label=f"H{dim}")
+    ax.plot([0.0, finite_max], [0.0, finite_max], linestyle="--", color="black", linewidth=1.0)
+    ax.set_xlim(0.0, finite_max * 1.05)
+    ax.set_ylim(0.0, finite_max * 1.05)
+    ax.set_xlabel("Birth")
+    ax.set_ylabel("Death")
+    ax.set_title(title)
+    if diagrams:
+        ax.legend()
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)

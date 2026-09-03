@@ -14,6 +14,13 @@ All approaches are intended to train on clean MIT-BIH Arrhythmia Database beats 
 
 This milestone implements the shared data, preprocessing, noise, and TDA pipeline needed before model training.
 
+The TDA implementation is currently consolidated onto `gudhi` for:
+
+- Vietoris-Rips persistent homology
+- 1D sublevel-set persistent homology
+- persistence images
+- diagram distances
+
 ## Datasets
 
 - MIT-BIH Arrhythmia Database (`mitdb`)
@@ -75,6 +82,12 @@ This computes:
 - H0/H1 persistence diagrams
 - persistence images
 
+Alternative direct 1D topology baseline:
+
+```bash
+python3 scripts/compute_tda.py --record 100 --beat-index 0 --method sublevel
+```
+
 ## End-to-End Smoke Test
 
 ```bash
@@ -126,7 +139,9 @@ Implemented:
 - Record-based split configuration
 - NSTDB noise loading and SNR-based corruption
 - Delay embedding and persistent homology computation
+- Alternative sublevel-set persistent homology baseline
 - Persistence image generation
+- Persistence summary statistics
 - Diagram distance utilities
 - End-to-end smoke-test script
 - Lightweight tests
@@ -142,4 +157,6 @@ Not implemented yet:
 
 - Splitting is record-driven by configuration; beats are not randomly split by default.
 - Persistence image fitting is currently local to the input diagrams for smoke testing. For formal experiments it should be fit on training data only and reused for validation/test data.
+- The primary TDA path is `Takens delay embedding -> Vietoris-Rips PH -> H0/H1 -> persistence image/statistics`.
+- The secondary TDA path is `1D sublevel-set PH -> H0 -> persistence image/statistics`.
 - Large datasets and generated artifacts are excluded from Git via `.gitignore`.

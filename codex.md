@@ -17,6 +17,8 @@ Planned comparison:
 
 Current milestone is only the shared data, preprocessing, noise, and TDA pipeline. Full model training is intentionally deferred.
 
+As of September 3, 2026, the active TDA implementation is consolidated onto `gudhi` rather than mixing multiple TDA libraries.
+
 ## MIT-BIH Summary
 
 MIT-BIH is used as the clean source dataset.
@@ -114,6 +116,33 @@ This keeps the label fixed while changing only signal quality, which is necessar
 Implementation reference:
 
 - [src/data/noise.py](/Users/sid/Desktop/masters_final/src/data/noise.py:1)
+
+## Active TDA Methods
+
+Primary method:
+
+- ECG beat
+- time-delay embedding / Takens reconstruction
+- Vietoris-Rips persistent homology
+- H0 and H1 diagrams
+- persistence images
+- persistence summary statistics
+
+Secondary method:
+
+- ECG beat
+- direct 1D sublevel-set persistent homology
+- H0 diagram
+- persistence image
+- persistence summary statistics
+
+Main code references:
+
+- [src/tda/pipeline.py](/Users/sid/Desktop/masters_final/src/tda/pipeline.py:1)
+- [src/tda/persistence.py](/Users/sid/Desktop/masters_final/src/tda/persistence.py:1)
+- [src/tda/representations.py](/Users/sid/Desktop/masters_final/src/tda/representations.py:1)
+- [src/tda/statistics.py](/Users/sid/Desktop/masters_final/src/tda/statistics.py:1)
+- [src/tda/distances.py](/Users/sid/Desktop/masters_final/src/tda/distances.py:1)
 
 ## PhysioNet File Types
 

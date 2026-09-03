@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from src.data.beat_extraction import BeatWindow, extract_beats
 from src.data.load_ecg import load_annotations, load_noise_record, load_record
 from src.data.noise import NoiseAugmentor
 from src.tda.distances import compute_diagram_distance
-from src.tda.embedding import delay_embed
-from src.tda.persistence import compute_persistence_diagrams
-from src.tda.representations import build_persistence_image
+from src.tda.pipeline import BeatTDAPipeline, TakensEmbeddingConfig, VietorisRipsConfig
+from src.tda.representations import PersistenceImageConfig
 from src.utils.config import load_project_configs
-from src.utils.paths import REPO_ROOT, ensure_dir
+from src.utils.paths import REPO_ROOT as PROJECT_ROOT, ensure_dir
 from src.utils.plotting import (
     save_diagram_plot,
     save_embedding_plot,
@@ -35,7 +39,7 @@ def select_beat(record_id: str, beat_index: int, configs: dict) -> tuple:
     beat_cfg = data_cfg["data"]["beat_window"]
     window = BeatWindow(pre_samples=beat_cfg["pre_samples"], post_samples=beat_cfg["post_samples"])
 
-    mitdb_dir = REPO_ROOT / data_cfg["paths"]["mitdb_dir"]
+    mitdb_dir = PROJECT_ROOT / data_cfg["paths"]["mitdb_dir"]
     record = load_record(mitdb_dir, record_id)
     annotations = load_annotations(mitdb_dir, record_id)
     beats = extract_beats(record.signal, annotations.samples, annotations.symbols, record_id, window)
@@ -53,73 +57,57 @@ def main() -> None:
 
     data_cfg = configs["data"]
     tda_cfg = configs["tda"]
-    output_dir = ensure_dir(REPO_ROOT / data_cfg["paths"]["results_dir"] / "smoke_test")
+    output_dir = ensure_dir(PROJECT_ROOT / data_cfg["paths"]["results_dir"] / "smoke_test")
 
     record, beat = select_beat(args.record, args.beat_index, configs)
-    noise_record = load_noise_record(REPO_ROOT / data_cfg["paths"]["nstdb_dir"], args.noise_type)
+    noise_record = load_noise_record(PROJECT_ROOT / data_cfg["paths"]["nstdb_dir"], args.noise_type)
     augmentor = NoiseAugmentor(seed=data_cfg["noise"]["seed"])
     noisy_result = augmentor.add_noise(beat.waveform, noise_record.signal, args.noise_type, args.snr_db)
 
-    embedding_kwargs = {
-        "dimension": tda_cfg["tda"]["embedding_dimension"],
-        "delay": tda_cfg["tda"]["delay"],
-        "stride": tda_cfg["tda"]["stride"],
-    }
-    clean_embedding = delay_embed(noisy_result.clean, **embedding_kwargs)
-    noisy_embedding = delay_embed(noisy_result.noisy, **embedding_kwargs)
+    pipeline = BeatTDAPipeline(
+        embedding_config=TakensEmbeddingConfig(
+            dimension=tda_cfg["tda"]["embedding_dimension"],
+            delay=tda_cfg["tda"]["delay"],
+            stride=tda_cfg["tda"]["stride"],
+        ),
+        vr_config=VietorisRipsConfig(
+            max_homology_dimension=tda_cfg["tda"]["max_homology_dimension"],
+            max_edge_length=tda_cfg["tda"]["max_edge_length"],
+        ),
+        image_config=PersistenceImageConfig(
+            resolution=tuple(tda_cfg["persistence_image"]["resolution"]),
+            birth_range=tuple(tda_cfg["persistence_image"]["birth_range"]),
+            persistence_range=tuple(tda_cfg["persistence_image"]["persistence_range"]),
+            bandwidth=tda_cfg["persistence_image"]["bandwidth"],
+        ),
+    )
+    clean_output = pipeline.run_vietoris_rips(noisy_result.clean)
+    noisy_output = pipeline.run_vietoris_rips(noisy_result.noisy)
 
-    persistence_kwargs = {
-        "maxdim": tda_cfg["tda"]["max_homology_dimension"],
-        "thresh": tda_cfg["tda"]["thresh"],
-    }
-    clean_persistence = compute_persistence_diagrams(clean_embedding, **persistence_kwargs)
-    noisy_persistence = compute_persistence_diagrams(noisy_embedding, **persistence_kwargs)
-
-    image_cfg = tda_cfg["persistence_image"]
-    clean_images = []
-    noisy_images = []
     distances = []
-    for dim in range(len(clean_persistence.diagrams)):
-        clean_images.append(
-            build_persistence_image(
-                clean_persistence.diagrams[dim],
-                homology_dimension=dim,
-                pixel_size=image_cfg["pixel_size"],
-                birth_range=tuple(image_cfg["birth_range"]),
-                pers_range=tuple(image_cfg["pers_range"]),
-            )
-        )
-        noisy_images.append(
-            build_persistence_image(
-                noisy_persistence.diagrams[dim],
-                homology_dimension=dim,
-                pixel_size=image_cfg["pixel_size"],
-                birth_range=tuple(image_cfg["birth_range"]),
-                pers_range=tuple(image_cfg["pers_range"]),
-            )
-        )
+    for dim in clean_output.diagrams:
         distances.append(
             compute_diagram_distance(
-                clean_persistence.diagrams[dim],
-                noisy_persistence.diagrams[dim],
+                clean_output.diagrams[dim],
+                noisy_output.diagrams[dim],
                 homology_dimension=dim,
             )
         )
 
     stem = f"{args.record}_beat{args.beat_index}_{args.noise_type}_{int(args.snr_db)}db"
     save_waveform_plot(noisy_result.clean, noisy_result.noisy, output_dir / f"{stem}_waveforms.png", f"Record {args.record} beat {args.beat_index}")
-    save_embedding_plot(clean_embedding, output_dir / f"{stem}_clean_embedding.png", "Clean delay embedding")
-    save_embedding_plot(noisy_embedding, output_dir / f"{stem}_noisy_embedding.png", "Noisy delay embedding")
-    save_diagram_plot(clean_persistence.diagrams, output_dir / f"{stem}_clean_diagrams.png", "Clean persistence diagrams")
-    save_diagram_plot(noisy_persistence.diagrams, output_dir / f"{stem}_noisy_diagrams.png", "Noisy persistence diagrams")
+    save_embedding_plot(clean_output.embedding, output_dir / f"{stem}_clean_embedding.png", "Clean delay embedding")
+    save_embedding_plot(noisy_output.embedding, output_dir / f"{stem}_noisy_embedding.png", "Noisy delay embedding")
+    save_diagram_plot(clean_output.diagrams, output_dir / f"{stem}_clean_diagrams.png", "Clean persistence diagrams")
+    save_diagram_plot(noisy_output.diagrams, output_dir / f"{stem}_noisy_diagrams.png", "Noisy persistence diagrams")
 
-    for image_result in clean_images:
+    for image_result in clean_output.persistence_images.values():
         save_persistence_image_plot(
             image_result.image,
             output_dir / f"{stem}_clean_H{image_result.homology_dimension}_pi.png",
             f"Clean persistence image H{image_result.homology_dimension}",
         )
-    for image_result in noisy_images:
+    for image_result in noisy_output.persistence_images.values():
         save_persistence_image_plot(
             image_result.image,
             output_dir / f"{stem}_noisy_H{image_result.homology_dimension}_pi.png",
@@ -134,6 +122,12 @@ def main() -> None:
             f"H{metric.homology_dimension}: "
             f"bottleneck={metric.bottleneck_distance:.6f}, "
             f"wasserstein={metric.wasserstein_distance:.6f}"
+        )
+    for dim, stats in clean_output.statistics.items():
+        print(
+            f"Clean H{dim} stats: "
+            f"features={stats.num_features}, total_persistence={stats.total_persistence:.6f}, "
+            f"max_persistence={stats.max_persistence:.6f}, entropy={stats.persistent_entropy:.6f}"
         )
     print(f"Diagnostic plots saved to {Path(output_dir)}")
 

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from src.data.beat_extraction import BeatWindow, extract_beats, save_beats
 from src.data.load_ecg import load_annotations, load_record
 from src.utils.config import load_project_configs
-from src.utils.paths import REPO_ROOT
+from src.utils.paths import REPO_ROOT as PROJECT_ROOT
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,8 +26,8 @@ def main() -> None:
     beat_cfg = config["data"]["beat_window"]
     window = BeatWindow(pre_samples=beat_cfg["pre_samples"], post_samples=beat_cfg["post_samples"])
 
-    mitdb_dir = REPO_ROOT / config["paths"]["mitdb_dir"]
-    processed_dir = REPO_ROOT / config["paths"]["processed_clean_dir"]
+    mitdb_dir = PROJECT_ROOT / config["paths"]["mitdb_dir"]
+    processed_dir = PROJECT_ROOT / config["paths"]["processed_clean_dir"]
     unknown_class = config["labels"]["unknown_class"]
 
     for record_id in args.records:

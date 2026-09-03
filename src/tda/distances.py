@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import gudhi
 import numpy as np
-from persim import bottleneck, wasserstein
+from gudhi import hera
+
+from src.tda.representations import filter_finite_diagram
 
 
 @dataclass
@@ -18,11 +21,11 @@ def compute_diagram_distance(
     noisy_diagram: np.ndarray,
     homology_dimension: int,
 ) -> DiagramDistance:
-    clean_finite = clean_diagram[np.isfinite(clean_diagram).all(axis=1)]
-    noisy_finite = noisy_diagram[np.isfinite(noisy_diagram).all(axis=1)]
+    clean_finite = filter_finite_diagram(clean_diagram).astype(np.float64)
+    noisy_finite = filter_finite_diagram(noisy_diagram).astype(np.float64)
 
     return DiagramDistance(
         homology_dimension=homology_dimension,
-        bottleneck_distance=float(bottleneck(clean_finite, noisy_finite)),
-        wasserstein_distance=float(wasserstein(clean_finite, noisy_finite)),
+        bottleneck_distance=float(gudhi.bottleneck_distance(clean_finite, noisy_finite)),
+        wasserstein_distance=float(hera.wasserstein_distance(clean_finite, noisy_finite, order=1.0, internal_p=float("inf"))),
     )
