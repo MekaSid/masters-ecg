@@ -16,6 +16,8 @@ data/raw/*
 !data/raw/nstdb/
 !data/raw/nstdb/.gitkeep
 
+data/physionet.org/
+
 data/raw/mitdb/*
 !data/raw/mitdb/.gitkeep
 data/raw/nstdb/*
