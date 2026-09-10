@@ -26,6 +26,85 @@ def save_waveform_plot(
     plt.close(fig)
 
 
+def save_annotated_ecg_window(
+    signal: np.ndarray,
+    sampling_rate: int,
+    channel_name: str,
+    record_id: str,
+    start_sample: int,
+    annotation_samples: np.ndarray,
+    annotation_symbols: list[str],
+    output_path: Path,
+) -> None:
+    """Save a labeled ECG window and any MIT-BIH annotations inside it."""
+    if signal.ndim != 1:
+        raise ValueError(f"Expected a 1D ECG signal, received shape {signal.shape}.")
+    if sampling_rate <= 0:
+        raise ValueError("Sampling rate must be positive.")
+
+    time_seconds = (np.arange(len(signal)) + start_sample) / sampling_rate
+    start_time = start_sample / sampling_rate
+    end_time = (start_sample + len(signal)) / sampling_rate
+
+    fig, ax = plt.subplots(figsize=(13, 5.5))
+    ax.plot(time_seconds, signal, color="#1b4965", linewidth=1.0, label=f"{channel_name} waveform")
+
+    window_mask = (annotation_samples >= start_sample) & (annotation_samples < start_sample + len(signal))
+    plotted_samples = annotation_samples[window_mask]
+    plotted_symbols = [symbol for symbol, include in zip(annotation_symbols, window_mask) if include]
+    beat_mask = np.asarray([symbol != "+" for symbol in plotted_symbols], dtype=bool)
+
+    if beat_mask.any():
+        beat_samples = plotted_samples[beat_mask]
+        beat_values = signal[beat_samples - start_sample]
+        ax.scatter(
+            beat_samples / sampling_rate,
+            beat_values,
+            color="#d1495b",
+            edgecolor="white",
+            linewidth=0.5,
+            s=38,
+            zorder=3,
+            label="Annotated beat",
+        )
+        for sample, symbol, value in zip(beat_samples, np.asarray(plotted_symbols)[beat_mask], beat_values):
+            ax.annotate(
+                symbol,
+                xy=(sample / sampling_rate, value),
+                xytext=(0, 8),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#8c2f39",
+            )
+
+    description = (
+        f"Blue trace: physical ECG amplitude from MIT-BIH record {record_id}.\n"
+        "Red markers and symbols: expert beat annotations inside this window.\n"
+        "This is a clean source waveform before NSTDB noise is added."
+    )
+    ax.text(
+        0.01,
+        0.98,
+        description,
+        transform=ax.transAxes,
+        va="top",
+        ha="left",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.45", "facecolor": "white", "edgecolor": "#9fb3c8", "alpha": 0.93},
+    )
+    ax.set_title(f"MIT-BIH Record {record_id}: {channel_name} ECG ({start_time:.1f}-{end_time:.1f} s)")
+    ax.set_xlabel("Time (seconds)")
+    ax.set_ylabel("ECG amplitude (mV)")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="lower right")
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def save_embedding_plot(
     embedding: np.ndarray,
     output_path: Path,

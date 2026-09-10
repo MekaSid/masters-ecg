@@ -70,6 +70,14 @@ This extracts fixed-length heartbeat windows around annotated beats, preserves o
 - beat metadata to `data/processed/clean/*.csv`
 - waveform arrays to `data/processed/clean/*.npz`
 
+## Visualize an ECG Window
+
+```bash
+./.venv/bin/python scripts/visualize_ecg.py --record 100 --channel 0 --start-seconds 0 --duration-seconds 10
+```
+
+This saves a labeled PNG under `results/waveforms/`. The graph uses physical ECG amplitude in mV, labels the time axis in seconds, and marks annotated beats from the matching `.atr` file.
+
 ## Run TDA Pipeline
 
 ```bash
