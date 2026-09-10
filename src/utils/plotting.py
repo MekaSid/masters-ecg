@@ -46,7 +46,12 @@ def save_annotated_ecg_window(
     start_time = start_sample / sampling_rate
     end_time = (start_sample + len(signal)) / sampling_rate
 
-    fig, ax = plt.subplots(figsize=(13, 5.5))
+    fig, (ax, caption_ax) = plt.subplots(
+        2,
+        1,
+        figsize=(13, 6.4),
+        gridspec_kw={"height_ratios": [5, 1]},
+    )
     ax.plot(time_seconds, signal, color="#1b4965", linewidth=1.0, label=f"{channel_name} waveform")
 
     window_mask = (annotation_samples >= start_sample) & (annotation_samples < start_sample + len(signal))
@@ -84,21 +89,22 @@ def save_annotated_ecg_window(
         "Red markers and symbols: expert beat annotations inside this window.\n"
         "This is a clean source waveform before NSTDB noise is added."
     )
-    ax.text(
+    caption_ax.text(
         0.01,
-        0.98,
+        0.5,
         description,
-        transform=ax.transAxes,
-        va="top",
+        transform=caption_ax.transAxes,
+        va="center",
         ha="left",
         fontsize=9,
-        bbox={"boxstyle": "round,pad=0.45", "facecolor": "white", "edgecolor": "#9fb3c8", "alpha": 0.93},
+        bbox={"boxstyle": "round,pad=0.45", "facecolor": "#f4f8fb", "edgecolor": "#9fb3c8"},
     )
     ax.set_title(f"MIT-BIH Record {record_id}: {channel_name} ECG ({start_time:.1f}-{end_time:.1f} s)")
     ax.set_xlabel("Time (seconds)")
     ax.set_ylabel("ECG amplitude (mV)")
     ax.grid(True, alpha=0.25)
     ax.legend(loc="lower right")
+    caption_ax.axis("off")
     fig.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=180, bbox_inches="tight")
