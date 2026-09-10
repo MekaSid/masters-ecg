@@ -1,5 +1,5 @@
 from __future__ import annotations
 
+from src.training.train import evaluate_model
 
-def evaluate() -> None:
-    raise NotImplementedError("Evaluation is intentionally deferred until the model-training milestone.")
+__all__ = ["evaluate_model"]

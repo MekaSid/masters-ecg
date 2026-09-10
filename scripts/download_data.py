@@ -17,6 +17,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download MIT-BIH Arrhythmia and NSTDB data.")
     parser.add_argument("--mitdb-records", nargs="*", default=["100"], help="MIT-BIH record IDs to download.")
     parser.add_argument("--nstdb-records", nargs="*", default=["bw", "ma", "em"], help="NSTDB noise record IDs.")
+    parser.add_argument("--skip-nstdb", action="store_true", help="Download only MIT-BIH records.")
     return parser.parse_args()
 
 
@@ -29,7 +30,8 @@ def main() -> None:
     nstdb_dir = PROJECT_ROOT / paths["nstdb_dir"]
 
     download_physionet_database("mitdb", mitdb_dir, args.mitdb_records)
-    download_physionet_database("nstdb", nstdb_dir, args.nstdb_records)
+    if not args.skip_nstdb:
+        download_physionet_database("nstdb", nstdb_dir, args.nstdb_records)
 
 
 if __name__ == "__main__":

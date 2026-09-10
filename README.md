@@ -94,6 +94,24 @@ This computes:
 - H0/H1 persistence diagrams
 - persistence images
 
+## Train the Raw ECG Conv1D Baseline
+
+```bash
+./.venv/bin/python scripts/download_data.py --mitdb-records 101 106 108 109 --skip-nstdb
+./.venv/bin/python scripts/train_raw_ecg.py
+```
+
+The baseline architecture is `ECG beat -> Conv1D -> Conv1D -> Conv1D -> max pooling -> fully connected classifier`.
+
+The initial record-disjoint pilot split is configured in `configs/training.yaml`:
+
+- Train: records `100`, `101`, `106`
+- Validation: record `109`
+- Test: record `108`
+- Target classes: `N` (normal), `S` (supraventricular), `V` (ventricular)
+
+The script saves `raw_ecg_conv1d.pt`, `metrics.json`, and `history.csv` under `results/raw_cnn/`. This small split is intended to validate the training path only; a formal experiment should use a larger standard patient-disjoint MIT-BIH split because these few records have highly uneven class distributions.
+
 Alternative direct 1D topology baseline:
 
 ```bash
@@ -160,7 +178,6 @@ Implemented:
 
 Not implemented yet:
 
-- Full raw ECG deep-learning training
 - TDA classifier training
 - Fusion model training
 - Formal train/validation/test experiment runner
