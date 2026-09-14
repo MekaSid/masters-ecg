@@ -78,6 +78,14 @@ This extracts fixed-length heartbeat windows around annotated beats, preserves o
 
 This saves a labeled PNG under `results/waveforms/`. The graph uses physical ECG amplitude in mV, labels the time axis in seconds, and marks annotated beats from the matching `.atr` file.
 
+Generate ten different examples sampled across the recording:
+
+```bash
+./.venv/bin/python scripts/generate_waveform_examples.py --record 100 --count 10 --duration-seconds 5
+```
+
+The individual PNGs are saved under `results/waveforms/record_100_examples/`.
+
 ### Annotation Symbols in Waveform Plots
 
 The letter above each red marker is the original MIT-BIH expert annotation, not a prediction. Common symbols are `N` (normal), `A` (atrial premature), `V` (premature ventricular), `F` (fusion), and `/` (paced). The preprocessing step preserves these detailed labels and maps them into broader AAMI-style classes in `src/data/labels.py`.
