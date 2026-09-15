@@ -113,20 +113,31 @@ This computes:
 ## Train the Raw ECG Conv1D Baseline
 
 ```bash
-./.venv/bin/python scripts/download_data.py --mitdb-records 101 106 108 109 --skip-nstdb
 ./.venv/bin/python scripts/train_raw_ecg.py
 ```
 
 The baseline architecture is `ECG beat -> Conv1D -> Conv1D -> Conv1D -> max pooling -> fully connected classifier`.
 
-The initial record-disjoint pilot split is configured in `configs/training.yaml`:
+The record-disjoint split is configured in `configs/training.yaml`:
 
-- Train: records `100`, `101`, `106`
-- Validation: record `109`
-- Test: record `108`
+- Train: 18 standard DS1 records
+- Validation: 4 held-out DS1 records
+- Test: 22 standard DS2 records
 - Target classes: `N` (normal), `S` (supraventricular), `V` (ventricular)
 
-The script saves `raw_ecg_conv1d.pt`, `metrics.json`, and `history.csv` under `results/raw_cnn/`. This small split is intended to validate the training path only; a formal experiment should use a larger standard patient-disjoint MIT-BIH split because these few records have highly uneven class distributions.
+The script saves `raw_ecg_conv1d.pt`, `metrics.json`, and `history.csv` under `results/raw_cnn/full_clean_record_disjoint/`.
+
+## Reproduce Zhang et al. Regular CNN
+
+The separate Zhang et al. (2021) reproduction uses the paper's DS1-to-DS2 protocol, dynamic two-lead heartbeat windows, 128-point resampling, mean removal, pre-RR and near-pre-RR ratio feature rows, and the seven-convolution residual-attention encoder. It intentionally excludes the paper's adversarial subject-ID branch.
+
+```bash
+./.venv/bin/python scripts/train_zhang_regular_cnn.py --run-name zhang_regular_clean
+```
+
+Configuration is in `configs/zhang_regular_cnn.yaml`. Training uses Adam, validation-loss learning-rate reduction, and validation-loss early stopping. Artifacts are saved under `results/zhang_regular_cnn/zhang_regular_clean/`.
+
+This is a close reproduction rather than a bit-for-bit replication: the publication does not provide source code or attention-module internals, so the implementation uses a documented channel-and-temporal attention block. It also retains all supported beats in the current official MIT-BIH annotations; this produces slightly more beats than the paper's printed class-count table. The paper is [Zhang et al., 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8181174/).
 
 Alternative direct 1D topology baseline:
 

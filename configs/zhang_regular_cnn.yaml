@@ -1,0 +1,13 @@
+zhang_regular_cnn:
+  # Zhang et al. (2021): DS1 training records and untouched DS2 test records.
+  classes: [N, S, V, F, Q]
+  ds1_records: ["101", "106", "108", "109", "112", "114", "115", "116", "118", "119", "122", "124", "201", "203", "205", "207", "208", "209", "215", "220", "223", "230"]
+  ds2_records: ["100", "103", "105", "111", "113", "117", "121", "123", "200", "202", "210", "212", "213", "214", "219", "221", "222", "228", "231", "232", "233", "234"]
+  validation_fraction: 0.20
+  split_seed: 42
+  batch_size: 128
+  learning_rate: 0.001
+  lr_factor: 0.1
+  lr_patience: 10
+  early_stopping_patience: 20
+  max_epochs: 120
