@@ -31,10 +31,10 @@ Data access is handled with `wfdb` and stored locally under `data/raw/`.
 ## Repository Layout
 
 ```text
-configs/         YAML configuration for data and TDA parameters
+configs/         YAML configuration: data/TDA at root, model runs in models/
 data/            Raw, processed, and TDA-derived artifacts
 notebooks/       Lightweight exploration notebooks
-scripts/         CLI entrypoints for download, preprocessing, noise, TDA, and smoke tests
+scripts/         CLI entrypoints grouped into data/, tda/, training/, visualization/
 src/             Reusable project code
 tests/           Lightweight unit tests for core pipeline steps
 results/         Figures and diagnostic outputs
@@ -51,7 +51,7 @@ pip install -r requirements.txt
 ## Download Data
 
 ```bash
-python3 scripts/download_data.py
+python3 scripts/data/download_data.py
 ```
 
 This downloads:
@@ -62,7 +62,7 @@ This downloads:
 ## Preprocess MIT-BIH Beats
 
 ```bash
-python3 scripts/preprocess_mitdb.py --records 100
+python3 scripts/data/preprocess_mitdb.py --records 100
 ```
 
 This extracts fixed-length heartbeat windows around annotated beats, preserves original symbols, maps labels into AAMI-style classes, and saves:
@@ -73,7 +73,7 @@ This extracts fixed-length heartbeat windows around annotated beats, preserves o
 ## Visualize an ECG Window
 
 ```bash
-./.venv/bin/python scripts/visualize_ecg.py --record 100 --channel 0 --start-seconds 0 --duration-seconds 10
+./.venv/bin/python scripts/visualization/visualize_ecg.py --record 100 --channel 0 --start-seconds 0 --duration-seconds 10
 ```
 
 This saves a labeled PNG under `results/waveforms/`. The graph uses physical ECG amplitude in mV, labels the time axis in seconds, and marks annotated beats from the matching `.atr` file.
@@ -81,7 +81,7 @@ This saves a labeled PNG under `results/waveforms/`. The graph uses physical ECG
 Generate ten different examples sampled across the recording:
 
 ```bash
-./.venv/bin/python scripts/generate_waveform_examples.py --record 100 --count 10 --duration-seconds 5
+./.venv/bin/python scripts/visualization/generate_waveform_examples.py --record 100 --count 10 --duration-seconds 5
 ```
 
 The individual PNGs are saved under `results/waveforms/record_100_examples/`.
@@ -89,7 +89,7 @@ The individual PNGs are saved under `results/waveforms/record_100_examples/`.
 ## Visualize NSTDB Noise
 
 ```bash
-./.venv/bin/python scripts/visualize_noise.py --noise-type ma --channel 0 --start-seconds 0 --duration-seconds 10
+./.venv/bin/python scripts/visualization/visualize_noise.py --noise-type ma --channel 0 --start-seconds 0 --duration-seconds 10
 ```
 
 This saves a labeled raw-noise PNG under `results/noise/`. Replace `ma` with `bw` for baseline wander or `em` for electrode-motion noise.
@@ -101,7 +101,7 @@ The letter above each red marker is the original MIT-BIH expert annotation, not 
 ## Run TDA Pipeline
 
 ```bash
-python3 scripts/compute_tda.py --record 100 --beat-index 0
+python3 scripts/tda/compute_tda.py --record 100 --beat-index 0
 ```
 
 This computes:
@@ -113,12 +113,12 @@ This computes:
 ## Train the Raw ECG Conv1D Baseline
 
 ```bash
-./.venv/bin/python scripts/train_raw_ecg.py
+./.venv/bin/python scripts/training/train_raw_ecg.py
 ```
 
 The baseline architecture is `ECG beat -> Conv1D -> Conv1D -> Conv1D -> max pooling -> fully connected classifier`.
 
-The record-disjoint split is configured in `configs/training.yaml`:
+The record-disjoint split is configured in `configs/models/training.yaml`:
 
 - Train: 18 standard DS1 records
 - Validation: 4 held-out DS1 records
@@ -132,23 +132,23 @@ The script saves `raw_ecg_conv1d.pt`, `metrics.json`, and `history.csv` under `r
 The separate Zhang et al. (2021) reproduction uses the paper's DS1-to-DS2 protocol, dynamic two-lead heartbeat windows, 128-point resampling, mean removal, pre-RR and near-pre-RR ratio feature rows, and the seven-convolution residual-attention encoder. It intentionally excludes the paper's adversarial subject-ID branch.
 
 ```bash
-./.venv/bin/python scripts/train_zhang_regular_cnn.py --run-name zhang_regular_clean
+./.venv/bin/python scripts/training/train_zhang_regular_cnn.py --run-name zhang_regular_clean
 ```
 
-Configuration is in `configs/zhang_regular_cnn.yaml`. Training uses Adam, validation-loss learning-rate reduction, and validation-loss early stopping. Artifacts are saved under `results/zhang_regular_cnn/zhang_regular_clean/`.
+Configuration is in `configs/models/zhang_regular_cnn.yaml`. Training uses Adam, validation-loss learning-rate reduction, and validation-loss early stopping. Artifacts are saved under `results/zhang_regular_cnn/zhang_regular_clean/`.
 
 This is a close reproduction rather than a bit-for-bit replication: the publication does not provide source code or attention-module internals, so the implementation uses a documented channel-and-temporal attention block. It also retains all supported beats in the current official MIT-BIH annotations; this produces slightly more beats than the paper's printed class-count table. The paper is [Zhang et al., 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8181174/).
 
 Alternative direct 1D topology baseline:
 
 ```bash
-python3 scripts/compute_tda.py --record 100 --beat-index 0 --method sublevel
+python3 scripts/tda/compute_tda.py --record 100 --beat-index 0 --method sublevel
 ```
 
 ## End-to-End Smoke Test
 
 ```bash
-python3 scripts/test_pipeline.py --record 100 --noise-type ma --snr-db 12
+python3 scripts/tda/test_pipeline.py --record 100 --noise-type ma --snr-db 12
 ```
 
 The smoke test:

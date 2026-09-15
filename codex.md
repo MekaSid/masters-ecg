@@ -191,7 +191,7 @@ That mirrored directory was started with `wget` and then intentionally interrupt
 
 What was attempted:
 
-1. The project downloader in `scripts/download_data.py` using `wfdb`
+1. The project downloader in `scripts/data/download_data.py` using `wfdb`
 2. That hit a transient PhysioNet `502 Bad Gateway` on `100.dat`
 3. Direct file downloads were then used to populate `data/raw/mitdb` and `data/raw/nstdb`
 4. Later, the website’s recommended recursive `wget` command was also tested successfully

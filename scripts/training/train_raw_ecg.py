@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     data_config = load_yaml(CONFIGS_DIR / "data.yaml")
-    training_config = load_yaml(CONFIGS_DIR / "training.yaml")["raw_ecg_cnn"]
+    training_config = load_yaml(CONFIGS_DIR / "models" / "training.yaml")["raw_ecg_cnn"]
     if args.epochs is not None:
         training_config["epochs"] = args.epochs
     set_seed(data_config["project"]["seed"])

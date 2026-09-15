@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -51,7 +51,7 @@ def class_counts(dataset: ZhangECGDataset, class_names: list[str]) -> dict[str, 
 def main() -> None:
     args = parse_args()
     data_config = load_yaml(CONFIGS_DIR / "data.yaml")
-    config = load_yaml(CONFIGS_DIR / "zhang_regular_cnn.yaml")["zhang_regular_cnn"]
+    config = load_yaml(CONFIGS_DIR / "models" / "zhang_regular_cnn.yaml")["zhang_regular_cnn"]
     if args.max_epochs is not None:
         config["max_epochs"] = args.max_epochs
     set_seed(data_config["project"]["seed"])
