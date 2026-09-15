@@ -111,6 +111,60 @@ def save_annotated_ecg_window(
     plt.close(fig)
 
 
+def save_noise_window(
+    signal: np.ndarray,
+    sampling_rate: int,
+    noise_type: str,
+    channel_name: str,
+    start_sample: int,
+    output_path: Path,
+) -> None:
+    """Save a labeled NSTDB noise waveform window as a PNG."""
+    if signal.ndim != 1:
+        raise ValueError(f"Expected a 1D noise signal, received shape {signal.shape}.")
+    if sampling_rate <= 0:
+        raise ValueError("Sampling rate must be positive.")
+
+    noise_names = {
+        "bw": "Baseline Wander",
+        "ma": "Muscle Artifact",
+        "em": "Electrode Motion",
+    }
+    start_time = start_sample / sampling_rate
+    end_time = (start_sample + len(signal)) / sampling_rate
+    time_seconds = (np.arange(len(signal)) + start_sample) / sampling_rate
+
+    fig, (ax, caption_ax) = plt.subplots(
+        2,
+        1,
+        figsize=(13, 6.0),
+        gridspec_kw={"height_ratios": [5, 1]},
+    )
+    ax.plot(time_seconds, signal, color="#a23e48", linewidth=1.0, label=f"{noise_type} / {channel_name}")
+    ax.set_title(f"NSTDB {noise_names.get(noise_type, noise_type)} ({start_time:.1f}-{end_time:.1f} s)")
+    ax.set_xlabel("Time (seconds)")
+    ax.set_ylabel("Noise amplitude (mV)")
+    ax.grid(True, alpha=0.25)
+    ax.legend(loc="upper right")
+
+    caption_ax.text(
+        0.01,
+        0.5,
+        f"Red trace: raw NSTDB {noise_names.get(noise_type, noise_type).lower()} recording.\n"
+        "This standalone noise segment is sampled, scaled to a target SNR, and added to clean MIT-BIH ECG beats.",
+        transform=caption_ax.transAxes,
+        va="center",
+        ha="left",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.45", "facecolor": "#fff5f5", "edgecolor": "#d9a0a7"},
+    )
+    caption_ax.axis("off")
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
 def save_embedding_plot(
     embedding: np.ndarray,
     output_path: Path,

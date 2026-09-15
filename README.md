@@ -86,6 +86,14 @@ Generate ten different examples sampled across the recording:
 
 The individual PNGs are saved under `results/waveforms/record_100_examples/`.
 
+## Visualize NSTDB Noise
+
+```bash
+./.venv/bin/python scripts/visualize_noise.py --noise-type ma --channel 0 --start-seconds 0 --duration-seconds 10
+```
+
+This saves a labeled raw-noise PNG under `results/noise/`. Replace `ma` with `bw` for baseline wander or `em` for electrode-motion noise.
+
 ### Annotation Symbols in Waveform Plots
 
 The letter above each red marker is the original MIT-BIH expert annotation, not a prediction. Common symbols are `N` (normal), `A` (atrial premature), `V` (premature ventricular), `F` (fusion), and `/` (paced). The preprocessing step preserves these detailed labels and maps them into broader AAMI-style classes in `src/data/labels.py`.
