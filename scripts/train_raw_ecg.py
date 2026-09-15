@@ -22,6 +22,11 @@ from src.utils.seed import set_seed
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the record-disjoint raw ECG Conv1D baseline.")
     parser.add_argument("--epochs", type=int, default=None, help="Override the configured epoch count.")
+    parser.add_argument(
+        "--run-name",
+        default="full_clean_record_disjoint",
+        help="Subdirectory under results/raw_cnn for this training run.",
+    )
     return parser.parse_args()
 
 
@@ -42,7 +47,7 @@ def main() -> None:
     train_dataset, train_summary = build_beat_split("train", training_config["train_records"], mitdb_dir, window, class_to_index)
     val_dataset, val_summary = build_beat_split("validation", training_config["val_records"], mitdb_dir, window, class_to_index)
     test_dataset, test_summary = build_beat_split("test", training_config["test_records"], mitdb_dir, window, class_to_index)
-    output_dir = ensure_dir(PROJECT_ROOT / data_config["paths"]["results_dir"] / "raw_cnn")
+    output_dir = ensure_dir(PROJECT_ROOT / data_config["paths"]["results_dir"] / "raw_cnn" / args.run_name)
 
     model_config = RawECGModelConfig(
         input_length=window.length,

@@ -76,7 +76,7 @@ def train_raw_ecg_model(
     training_config: dict[str, Any],
     output_dir: Path,
 ) -> tuple[RawECGConvNet, list[dict[str, float]], dict[str, Any]]:
-    """Train the raw ECG Conv1D baseline and select its checkpoint by validation accuracy."""
+    """Train the raw ECG Conv1D baseline and select its checkpoint by validation macro-F1."""
     output_dir.mkdir(parents=True, exist_ok=True)
     device = select_device()
     batch_size = int(training_config["batch_size"])
