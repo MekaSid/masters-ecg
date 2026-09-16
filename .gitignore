@@ -41,11 +41,15 @@ data/tda/*
 !data/tda/diagrams/.gitkeep
 !data/tda/persistence_images/
 !data/tda/persistence_images/.gitkeep
+!data/tda/betti_curves/
+!data/tda/betti_curves/.gitkeep
 
 data/tda/diagrams/*
 !data/tda/diagrams/.gitkeep
 data/tda/persistence_images/*
 !data/tda/persistence_images/.gitkeep
+data/tda/betti_curves/*
+!data/tda/betti_curves/.gitkeep
 
 results/*
 !results/.gitkeep

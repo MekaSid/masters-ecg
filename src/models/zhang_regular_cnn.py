@@ -83,10 +83,14 @@ class ZhangRegularCNN(nn.Module):
         self.classifier = nn.Linear(64, config.num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.classifier(self.encode(x))
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the 64-dimensional raw ECG/RR representation before classification."""
         if x.ndim != 4 or x.shape[1:] != (2, 3, 128):
             raise ValueError(f"Expected input shape (batch, 2, 3, 128), received {tuple(x.shape)}.")
         x = self.initial(x)
         x = self.block1(x)
         x = self.block2(x)
         x = self.block3(x)
-        return self.classifier(self.pool(x).flatten(1))
+        return self.pool(x).flatten(1)

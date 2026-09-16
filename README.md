@@ -139,6 +139,18 @@ Configuration is in `configs/models/zhang_regular_cnn.yaml`. Training uses Adam,
 
 This is a close reproduction rather than a bit-for-bit replication: the publication does not provide source code or attention-module internals, so the implementation uses a documented channel-and-temporal attention block. It also retains all supported beats in the current official MIT-BIH annotations; this produces slightly more beats than the paper's printed class-count table. The paper is [Zhang et al., 2021](https://pmc.ncbi.nlm.nih.gov/articles/PMC8181174/).
 
+## Train Dindin-Style Betti Models
+
+This controlled PH experiment computes GUDHI H0 sublevel and upper-level persistence on a three-beat lead-I sequence, converts both barcodes into 128-bin Betti curves, and trains PH-only and raw-plus-PH fusion models.
+
+```bash
+./.venv/bin/python scripts/training/train_dindin_betti_models.py --run-name dindin_betti_clean
+```
+
+The first run caches paired DS1/DS2 Betti curves under `data/tda/betti_curves/`; later runs reuse the cache. Use `--models ph_only` or `--models fusion` to train one branch, and `--rebuild-cache` to regenerate representations. Configuration is in `configs/models/dindin_betti_fusion.yaml`; results are saved under `results/dindin_betti/`.
+
+This is a controlled adaptation, not a full reproduction of Dindin et al.: their published architecture also includes filtering, autoencoders, FFT, handcrafted features, other databases, and patient-fold cross-validation. The PH-only and fusion branches here isolate the contribution of Betti curves to the Zhang raw/RR model. [Dindin et al., 2020](https://arxiv.org/abs/1906.05795).
+
 Alternative direct 1D topology baseline:
 
 ```bash
