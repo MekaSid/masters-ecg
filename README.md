@@ -149,6 +149,15 @@ This controlled PH experiment computes GUDHI H0 sublevel and upper-level persist
 
 The first run caches paired DS1/DS2 Betti curves under `data/tda/betti_curves/`; later runs reuse the cache. Use `--models ph_only` or `--models fusion` to train one branch, and `--rebuild-cache` to regenerate representations. Configuration is in `configs/models/dindin_betti_fusion.yaml`; results are saved under `results/dindin_betti/`.
 
+Run the matched raw-only versus fusion ablation across seeds and generate its PNG summary:
+
+```bash
+./.venv/bin/python scripts/training/train_dindin_betti_models.py \
+  --models raw_only fusion --seeds 42 43 44 --run-name paired_ablation
+./.venv/bin/python scripts/visualization/plot_ablation_results.py \
+  --run-dir results/dindin_betti/paired_ablation --seeds 42 43 44
+```
+
 This is a controlled adaptation, not a full reproduction of Dindin et al.: their published architecture also includes filtering, autoencoders, FFT, handcrafted features, other databases, and patient-fold cross-validation. The PH-only and fusion branches here isolate the contribution of Betti curves to the Zhang raw/RR model. [Dindin et al., 2020](https://arxiv.org/abs/1906.05795).
 
 Alternative direct 1D topology baseline:

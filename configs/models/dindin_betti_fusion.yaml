@@ -4,6 +4,7 @@ dindin_betti_fusion:
   ds2_records: ["100", "103", "105", "111", "113", "117", "121", "123", "200", "202", "210", "212", "213", "214", "219", "221", "222", "228", "231", "232", "233", "234"]
   validation_fraction: 0.20
   split_seed: 42
+  comparison_seeds: [42, 43, 44]
   # Dindin-style topology: GUDHI H0 sublevel and upper-level Betti curves.
   betti_resolution: 128
   ph_sequence_length: 256

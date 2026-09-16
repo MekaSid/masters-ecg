@@ -11,13 +11,16 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from src.models.betti_fusion_model import DindinPHOnlyCNN, ZhangBettiFusionCNN
+from src.models.zhang_regular_cnn import ZhangRegularCNN, ZhangRegularCNNConfig
 from src.training.betti_dataset import BettiFusionDataset
 from src.training.train import select_device
 
-ModelKind = Literal["ph_only", "fusion"]
+ModelKind = Literal["raw_only", "ph_only", "fusion"]
 
 
 def _forward(model: nn.Module, raw: torch.Tensor, betti: torch.Tensor, kind: ModelKind) -> torch.Tensor:
+    if kind == "raw_only":
+        return model(raw)
     return model(betti) if kind == "ph_only" else model(raw, betti)
 
 
@@ -79,7 +82,12 @@ def train_betti_model(
 ) -> tuple[list[dict[str, float]], dict[str, object]]:
     """Train a PH-only or end-to-end raw-plus-PH model using validation loss."""
     device = select_device()
-    model: nn.Module = DindinPHOnlyCNN(num_classes) if kind == "ph_only" else ZhangBettiFusionCNN(num_classes)
+    if kind == "raw_only":
+        model: nn.Module = ZhangRegularCNN(ZhangRegularCNNConfig(num_classes=num_classes))
+    elif kind == "ph_only":
+        model = DindinPHOnlyCNN(num_classes)
+    else:
+        model = ZhangBettiFusionCNN(num_classes)
     model = model.to(device)
     batch_size = int(config["batch_size"])
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)

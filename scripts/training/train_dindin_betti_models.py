@@ -24,7 +24,8 @@ from src.utils.seed import set_seed
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train Dindin-style Betti PH-only and fusion models.")
-    parser.add_argument("--models", nargs="+", choices=["ph_only", "fusion"], default=["ph_only", "fusion"])
+    parser.add_argument("--models", nargs="+", choices=["raw_only", "ph_only", "fusion"], default=["ph_only", "fusion"])
+    parser.add_argument("--seeds", nargs="+", type=int, default=None, help="Repeat the selected models with these split/training seeds.")
     parser.add_argument("--max-epochs", type=int, default=None)
     parser.add_argument("--run-name", default="dindin_betti_clean")
     parser.add_argument("--rebuild-cache", action="store_true")
@@ -54,7 +55,6 @@ def main() -> None:
     config = load_yaml(CONFIGS_DIR / "models" / "dindin_betti_fusion.yaml")["dindin_betti_fusion"]
     if args.max_epochs is not None:
         config["max_epochs"] = args.max_epochs
-    set_seed(data_config["project"]["seed"])
     class_names = list(config["classes"])
     class_to_index = {name: index for index, name in enumerate(class_names)}
     mitdb_dir = PROJECT_ROOT / data_config["paths"]["mitdb_dir"]
@@ -72,26 +72,31 @@ def main() -> None:
     ds2_dataset, ds2_summary = load_or_build_betti_split(
         ds2_cache, config["ds2_records"], mitdb_dir, class_to_index, betti_config, int(config["ph_sequence_length"]), int(config["ph_workers"])
     )
-    train_dataset, validation_dataset = split_dataset(ds1_dataset, float(config["validation_fraction"]), int(config["split_seed"]))
-    output_dir = ensure_dir(PROJECT_ROOT / data_config["paths"]["results_dir"] / "dindin_betti" / args.run_name)
-    common_metadata = {
-        "class_names": class_names,
-        "ds1": {"beats": ds1_summary.retained_beats, "class_counts": ds1_summary.class_counts},
-        "ds2": {"beats": ds2_summary.retained_beats, "class_counts": ds2_summary.class_counts},
-        "train": {"beats": len(train_dataset), "class_counts": counts(train_dataset, class_names)},
-        "validation": {"beats": len(validation_dataset), "class_counts": counts(validation_dataset, class_names)},
-        "ph_representation": "GUDHI H0 sublevel and upper-level Betti curves from three consecutive beats on lead I.",
-    }
-    for kind in args.models:
-        history, metrics = train_betti_model(kind, train_dataset, validation_dataset, ds2_dataset, len(class_names), config, output_dir)
-        metrics.update(common_metadata)
-        with (output_dir / f"{kind}_metrics.json").open("w", encoding="utf-8") as handle:
-            json.dump(metrics, handle, indent=2)
-        with (output_dir / f"{kind}_history.csv").open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=list(history[0]))
-            writer.writeheader()
-            writer.writerows(history)
-        print(f"{kind} DS2 accuracy={metrics['test']['accuracy']:.4f}; results={output_dir}")
+    seeds = args.seeds or [int(config["split_seed"])]
+    base_output_dir = ensure_dir(PROJECT_ROOT / data_config["paths"]["results_dir"] / "dindin_betti" / args.run_name)
+    for seed in seeds:
+        set_seed(seed)
+        train_dataset, validation_dataset = split_dataset(ds1_dataset, float(config["validation_fraction"]), seed)
+        output_dir = ensure_dir(base_output_dir / f"seed_{seed}") if len(seeds) > 1 else base_output_dir
+        common_metadata = {
+            "seed": seed,
+            "class_names": class_names,
+            "ds1": {"beats": ds1_summary.retained_beats, "class_counts": ds1_summary.class_counts},
+            "ds2": {"beats": ds2_summary.retained_beats, "class_counts": ds2_summary.class_counts},
+            "train": {"beats": len(train_dataset), "class_counts": counts(train_dataset, class_names)},
+            "validation": {"beats": len(validation_dataset), "class_counts": counts(validation_dataset, class_names)},
+            "ph_representation": "GUDHI H0 sublevel and upper-level Betti curves from three consecutive beats on lead I.",
+        }
+        for kind in args.models:
+            history, metrics = train_betti_model(kind, train_dataset, validation_dataset, ds2_dataset, len(class_names), config, output_dir)
+            metrics.update(common_metadata)
+            with (output_dir / f"{kind}_metrics.json").open("w", encoding="utf-8") as handle:
+                json.dump(metrics, handle, indent=2)
+            with (output_dir / f"{kind}_history.csv").open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(history[0]))
+                writer.writeheader()
+                writer.writerows(history)
+            print(f"seed={seed} {kind} DS2 accuracy={metrics['test']['accuracy']:.4f}; results={output_dir}")
 
 
 if __name__ == "__main__":

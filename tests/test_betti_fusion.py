@@ -2,6 +2,7 @@ import numpy as np
 import torch
 
 from src.models.betti_fusion_model import DindinPHOnlyCNN, ZhangBettiFusionCNN
+from src.models.zhang_regular_cnn import ZhangRegularCNN
 from src.tda.betti import BettiCurveConfig, betti_curve, dindin_betti_curves
 
 
@@ -23,4 +24,5 @@ def test_ph_only_and_fusion_output_shapes() -> None:
     raw = torch.randn(3, 2, 3, 128)
     betti = torch.randn(3, 2, 128)
     assert DindinPHOnlyCNN()(betti).shape == (3, 5)
+    assert ZhangRegularCNN()(raw).shape == (3, 5)
     assert ZhangBettiFusionCNN()(raw, betti).shape == (3, 5)

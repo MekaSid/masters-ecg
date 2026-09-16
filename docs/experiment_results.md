@@ -99,4 +99,29 @@ The PH construction uses GUDHI and follows Dindin et al.'s use of sublevel and u
 
 Artifacts: `results/dindin_betti/dindin_betti_clean/`. Cached PH inputs: `data/tda/betti_curves/`.
 
+## 4. Matched Raw-Only Versus Fusion Ablation
+
+**Status:** Complete three-seed clean-data ablation. No NSTDB noise was used.
+
+This removes the main ambiguity in the initial fusion comparison: both variants use the identical three-beat-filtered DS1 and DS2 examples. The raw-only model receives only the Zhang two-lead ECG/RR input; the fusion model receives the same raw input plus the precomputed Dindin-style Betti curves. Each seed changes both the DS1 train/validation partition and neural-network initialization.
+
+| Held-out DS2 metric | Raw-only mean +/- SD | Fusion mean +/- SD | Fusion change |
+|---|---:|---:|---:|
+| Accuracy | 92.57% +/- 1.36% | **95.61% +/- 0.94%** | +3.04 points |
+| `N` F1 | 95.90% +/- 0.80% | **97.66% +/- 0.54%** | +1.76 points |
+| `S` F1 | 72.76% +/- 3.66% | **75.20% +/- 5.72%** | +2.44 points |
+| `V` F1 | 89.47% +/- 3.04% | **91.60% +/- 2.26%** | +2.13 points |
+
+Seeds: `42`, `43`, `44`. The fusion accuracy was higher in all three matched runs. `S` F1 improved on average but has higher variation, so it should not be described as a settled improvement until evaluated under NSTDB noise and with more seeds.
+
+Generate the chart from saved JSON metrics:
+
+```bash
+./.venv/bin/python scripts/visualization/plot_ablation_results.py \
+  --run-dir results/dindin_betti/paired_ablation \
+  --seeds 42 43 44
+```
+
+Chart: `results/dindin_betti/paired_ablation/paired_ablation_metrics.png`.
+
 Reference: Dindin, Umeda, and Chazal, [Topological Data Analysis for Arrhythmia Detection through Modular Neural Networks](https://arxiv.org/abs/1906.05795), 2020.
