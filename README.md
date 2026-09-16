@@ -160,6 +160,16 @@ Run the matched raw-only versus fusion ablation across seeds and generate its PN
 
 This is a controlled adaptation, not a full reproduction of Dindin et al.: their published architecture also includes filtering, autoencoders, FFT, handcrafted features, other databases, and patient-fold cross-validation. The PH-only and fusion branches here isolate the contribution of Betti curves to the Zhang raw/RR model. [Dindin et al., 2020](https://arxiv.org/abs/1906.05795).
 
+## Generate ECG-to-PH Gallery
+
+Generate ten diverse, annotated ECG-to-PH comparisons from the locally downloaded MIT-BIH records:
+
+```bash
+./.venv/bin/python scripts/visualization/generate_ph_gallery.py --count 10
+```
+
+Each PNG places the raw three-beat ECG context beside the Dindin-style GUDHI H0 persistence barcodes and the sublevel/upper-level Betti curves used by the PH CNN. The default gallery prioritizes distinct non-`N` annotation symbols. Output PNGs and `selection.csv` are saved under `results/ph_gallery/`.
+
 Alternative direct 1D topology baseline:
 
 ```bash

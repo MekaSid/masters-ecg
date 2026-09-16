@@ -220,3 +220,108 @@ def save_persistence_image_plot(image: np.ndarray, output_path: Path, title: str
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
+
+
+def save_dindin_ph_comparison(
+    waveform: np.ndarray,
+    sampling_rate: int,
+    central_offset: int,
+    record_id: str,
+    original_symbol: str,
+    mapped_class: str,
+    sublevel_diagram: np.ndarray,
+    upper_diagram: np.ndarray,
+    betti_curves: np.ndarray,
+    output_path: Path,
+) -> None:
+    """Save a waveform, H0 barcodes, and Betti curves for one Dindin PH input."""
+    if waveform.ndim != 1 or len(waveform) < 2:
+        raise ValueError("Expected a one-dimensional ECG sequence with at least two samples.")
+    if betti_curves.shape[0] != 2:
+        raise ValueError(f"Expected sublevel/upper Betti curves, received {betti_curves.shape}.")
+    if not 0 <= central_offset < len(waveform):
+        raise ValueError("central_offset must identify a sample in waveform.")
+
+    def finite_intervals(diagram: np.ndarray, endpoint: float) -> np.ndarray:
+        intervals = diagram.astype(np.float32, copy=True)
+        if len(intervals) == 0:
+            return intervals
+        intervals[~np.isfinite(intervals[:, 1]), 1] = endpoint
+        intervals = intervals[np.isfinite(intervals).all(axis=1) & (intervals[:, 1] >= intervals[:, 0])]
+        # Keep barcodes readable; the Betti curves below still use all intervals.
+        order = np.argsort(intervals[:, 1] - intervals[:, 0])[::-1]
+        return intervals[order[:25]]
+
+    time = np.arange(len(waveform)) / sampling_rate
+    figure = plt.figure(figsize=(14, 7.2))
+    grid = figure.add_gridspec(2, 2, width_ratios=(1.25, 1.0), height_ratios=(1.2, 1.0))
+    waveform_ax = figure.add_subplot(grid[:, 0])
+    barcode_ax = figure.add_subplot(grid[0, 1])
+    betti_ax = figure.add_subplot(grid[1, 1])
+
+    waveform_ax.plot(time, waveform, color="#1b4965", linewidth=1.35)
+    waveform_ax.scatter(
+        central_offset / sampling_rate,
+        waveform[central_offset],
+        color="#d1495b",
+        edgecolor="white",
+        linewidth=0.6,
+        s=64,
+        zorder=3,
+        label=f"Central beat: {original_symbol} ({mapped_class})",
+    )
+    waveform_ax.axvline(central_offset / sampling_rate, color="#d1495b", linestyle="--", linewidth=0.9, alpha=0.8)
+    waveform_ax.set_title("ECG sequence used as PH input", fontweight="bold")
+    waveform_ax.set_xlabel("Time from preceding R peak (seconds)")
+    waveform_ax.set_ylabel("ECG amplitude (mV)")
+    waveform_ax.grid(alpha=0.25)
+    waveform_ax.legend(loc="best", fontsize=9)
+
+    sublevel = finite_intervals(sublevel_diagram, endpoint=1.0)
+    upper = finite_intervals(upper_diagram, endpoint=0.0)
+    barcode_rows: list[tuple[np.ndarray, str, str]] = [
+        (sublevel, "#277da1", "Sublevel H0"),
+        (upper, "#f8961e", "Upper-level H0 (computed on -ECG)"),
+    ]
+    row = 0
+    for intervals, color, label in barcode_rows:
+        for birth, death in intervals:
+            barcode_ax.hlines(row, birth, death, color=color, linewidth=1.5)
+            row += 1
+        if len(intervals):
+            barcode_ax.plot([], [], color=color, label=label)
+        row += 1
+    barcode_ax.set_title("GUDHI H0 barcodes (25 most persistent intervals)", fontweight="bold")
+    barcode_ax.set_xlabel("Filtration value")
+    barcode_ax.set_ylabel("Barcode interval")
+    barcode_ax.set_yticks([])
+    barcode_ax.grid(axis="x", alpha=0.25)
+    barcode_ax.legend(loc="best", fontsize=8)
+
+    curve_x = np.linspace(0.0, 1.0, betti_curves.shape[1])
+    betti_ax.plot(curve_x, betti_curves[0], color="#277da1", linewidth=1.5, label="Sublevel Betti curve")
+    betti_ax.plot(curve_x, betti_curves[1], color="#f8961e", linewidth=1.5, label="Upper-level Betti curve")
+    betti_ax.set_title("Fixed-length PH representation", fontweight="bold")
+    betti_ax.set_xlabel("Normalized filtration-grid position")
+    betti_ax.set_ylabel("Alive H0 components")
+    betti_ax.grid(alpha=0.25)
+    betti_ax.legend(loc="best", fontsize=8)
+
+    figure.suptitle(
+        f"MIT-BIH Record {record_id}: original annotation '{original_symbol}' -> AAMI class {mapped_class}",
+        fontsize=14,
+        fontweight="bold",
+    )
+    figure.text(
+        0.5,
+        0.01,
+        "Left: raw three-beat ECG context. Right: Dindin-style H0 PH after resampling and min-max normalization. "
+        "The two Betti curves are the inputs to the PH CNN.",
+        ha="center",
+        va="bottom",
+        fontsize=8.5,
+    )
+    figure.tight_layout(rect=(0, 0.05, 1, 0.93))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(figure)
