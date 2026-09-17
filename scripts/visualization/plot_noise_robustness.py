@@ -71,6 +71,8 @@ def main() -> None:
         axis.set_xlabel("Target SNR (dB): lower means stronger noise")
         axis.set_ylabel("Classification accuracy (%)")
         axis.set_xticks([float(record["snr_db"]) for record in points])
+        # Read left-to-right from light to severe corruption: 24 dB -> -6 dB.
+        axis.invert_xaxis()
         axis.set_ylim(30, 70)
         axis.grid(alpha=0.28)
         axis.legend(loc="lower right")
