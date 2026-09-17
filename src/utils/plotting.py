@@ -307,9 +307,17 @@ def save_dindin_ph_comparison(
     betti_ax.grid(alpha=0.25)
     betti_ax.legend(loc="best", fontsize=8)
 
+    class_names = {
+        "N": "Normal",
+        "S": "Supraventricular",
+        "V": "Ventricular",
+        "F": "Fusion",
+        "Q": "Unclassifiable / paced",
+    }
     figure.suptitle(
-        f"MIT-BIH Record {record_id}: original annotation '{original_symbol}' -> AAMI class {mapped_class}",
-        fontsize=14,
+        f"MIT-BIH Record {record_id}: original annotation '{original_symbol}'\n"
+        f"AAMI CLASS {mapped_class}: {class_names.get(mapped_class, mapped_class)}",
+        fontsize=15,
         fontweight="bold",
     )
     figure.text(
@@ -321,7 +329,7 @@ def save_dindin_ph_comparison(
         va="bottom",
         fontsize=8.5,
     )
-    figure.tight_layout(rect=(0, 0.05, 1, 0.93))
+    figure.tight_layout(rect=(0, 0.05, 1, 0.90))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=180, bbox_inches="tight")
     plt.close(figure)
