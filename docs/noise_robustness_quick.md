@@ -78,3 +78,41 @@ this class-balanced subset.
 
 Use `--max-per-class 0` to process all eligible DS2 examples. That is a more
 complete but slower evaluation.
+
+## Matched Seed-45 Follow-Up
+
+After the initial screening, raw-only and fusion were retrained using the same
+DS1 split seed (`45`), training schedule, validation-loss checkpoint selection,
+and clean training examples. Their full clean DS2 accuracies were 92.69%
+(raw-only) and 94.18% (fusion). The same quick class-balanced NSTDB evaluation
+then produced the results below.
+
+| Condition | SNR dB | Matched raw-only | Matched fusion |
+| --- | ---: | ---: | ---: |
+| clean | -- | 59.32 / 46.13 | 64.37 / 46.99 |
+| bw | 24 | 59.49 / 45.84 | 64.37 / 46.83 |
+| bw | 12 | 59.98 / 45.99 | 63.55 / 45.79 |
+| bw | 0 | 59.82 / 45.49 | 63.05 / 45.15 |
+| bw | -6 | 53.02 / 38.72 | 56.75 / 40.75 |
+| ma | 24 | 59.40 / 45.80 | 64.21 / 46.63 |
+| ma | 12 | 60.23 / 46.53 | 63.63 / 45.70 |
+| ma | 0 | 50.21 / 36.34 | 55.01 / 38.74 |
+| ma | -6 | 38.61 / 26.95 | 41.67 / 28.28 |
+| em | 24 | 60.07 / 46.14 | 64.04 / 46.35 |
+| em | 12 | 59.49 / 45.41 | 64.13 / 46.29 |
+| em | 0 | 51.62 / 36.58 | 53.69 / 36.70 |
+| em | -6 | 40.51 / 25.26 | 39.44 / 23.06 |
+| mix | 24 | 59.49 / 45.28 | 64.13 / 46.33 |
+| mix | 12 | 60.23 / 45.95 | 64.54 / 47.03 |
+| mix | 0 | 52.53 / 37.51 | 54.43 / 37.76 |
+| mix | -6 | 40.27 / 25.31 | 39.02 / 22.16 |
+
+Values are accuracy / macro-F1, in percent. Full metrics are local and ignored:
+
+- `results/noise_robustness/matched_seed45_quick_ds2/noise_robustness_metrics.json`
+- `results/noise_robustness/matched_seed45_quick_ds2/noise_robustness_summary.csv`
+
+This controlled single-seed result supports a limited conclusion: fusion has a
+better clean and moderate-noise operating point, but it is not uniformly more
+robust at severe electrode motion or severe combined noise. Multiple matched
+seeds and full DS2 evaluation are still required before making a final claim.
