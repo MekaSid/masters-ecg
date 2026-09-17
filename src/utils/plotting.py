@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Mapping, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -330,6 +330,134 @@ def save_dindin_ph_comparison(
         fontsize=8.5,
     )
     figure.tight_layout(rect=(0, 0.05, 1, 0.90))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(figure)
+
+
+def save_dindin_noise_comparison(
+    clean_waveform: np.ndarray,
+    noisy_examples: Mapping[str, tuple[np.ndarray, np.ndarray, np.ndarray, float]],
+    sampling_rate: int,
+    central_offset: int,
+    record_id: str,
+    original_symbol: str,
+    mapped_class: str,
+    clean_sublevel: np.ndarray,
+    clean_upper: np.ndarray,
+    clean_betti_curves: np.ndarray,
+    output_path: Path,
+) -> None:
+    """Save a clean-vs-NSTDB Dindin PH comparison for one ECG context.
+
+    ``noisy_examples`` maps a noise type to its waveform, sublevel H0 barcode,
+    upper-level H0 barcode, Betti curves, and achieved SNR in dB.
+    """
+    if clean_waveform.ndim != 1 or len(clean_waveform) < 2:
+        raise ValueError("Expected a one-dimensional clean ECG sequence with at least two samples.")
+    if sampling_rate <= 0:
+        raise ValueError("sampling_rate must be positive.")
+    if not 0 <= central_offset < len(clean_waveform):
+        raise ValueError("central_offset must identify a sample in clean_waveform.")
+    if clean_betti_curves.shape[0] != 2:
+        raise ValueError("Expected two clean Betti curves: sublevel and upper-level.")
+    if not noisy_examples:
+        raise ValueError("At least one noisy example is required.")
+
+    noise_names = {
+        "bw": "Baseline wander",
+        "ma": "Muscle artifact",
+        "em": "Electrode motion",
+    }
+    class_names = {
+        "N": "Normal",
+        "S": "Supraventricular",
+        "V": "Ventricular",
+        "F": "Fusion",
+        "Q": "Unclassifiable / paced",
+    }
+
+    def finite_intervals(diagram: np.ndarray, endpoint: float) -> np.ndarray:
+        intervals = diagram.astype(np.float32, copy=True)
+        if len(intervals) == 0:
+            return intervals
+        intervals[~np.isfinite(intervals[:, 1]), 1] = endpoint
+        intervals = intervals[np.isfinite(intervals).all(axis=1) & (intervals[:, 1] >= intervals[:, 0])]
+        return intervals[np.argsort(intervals[:, 1] - intervals[:, 0])[::-1][:25]]
+
+    columns = [("clean", clean_waveform, clean_sublevel, clean_upper, clean_betti_curves, None)]
+    columns.extend((noise_type, *values) for noise_type, values in noisy_examples.items())
+    figure, axes = plt.subplots(3, len(columns), figsize=(5.2 * len(columns), 10.2), squeeze=False)
+    figure.subplots_adjust(left=0.06, right=0.985, bottom=0.08, top=0.84, wspace=0.3, hspace=0.48)
+
+    for column_index, (noise_type, waveform, sublevel_diagram, upper_diagram, curves, achieved_snr) in enumerate(columns):
+        if waveform.ndim != 1 or len(waveform) != len(clean_waveform):
+            raise ValueError("Every noisy waveform must have the same one-dimensional shape as the clean waveform.")
+        if curves.shape[0] != 2:
+            raise ValueError("Expected sublevel and upper-level Betti curves for every column.")
+        time = np.arange(len(waveform)) / sampling_rate
+        waveform_ax, barcode_ax, betti_ax = axes[:, column_index]
+        color = "#1b4965" if noise_type == "clean" else "#a23e48"
+        waveform_ax.plot(time, waveform, color=color, linewidth=1.15)
+        waveform_ax.scatter(
+            central_offset / sampling_rate,
+            waveform[central_offset],
+            color="#d1495b",
+            edgecolor="white",
+            linewidth=0.55,
+            s=45,
+            zorder=3,
+        )
+        waveform_ax.axvline(central_offset / sampling_rate, color="#d1495b", linestyle="--", linewidth=0.8, alpha=0.8)
+        if noise_type == "clean":
+            waveform_ax.set_title("Clean MIT-BIH ECG", fontweight="bold")
+        else:
+            waveform_ax.set_title(f"{noise_names.get(noise_type, noise_type)}\n{achieved_snr:.1f} dB achieved SNR", fontweight="bold")
+        waveform_ax.set_xlabel("Time from preceding R peak (s)")
+        waveform_ax.set_ylabel("ECG amplitude (mV)" if column_index == 0 else "")
+        waveform_ax.grid(alpha=0.25)
+
+        row = 0
+        for intervals, color, label, endpoint in (
+            (sublevel_diagram, "#277da1", "Sublevel H0", 1.0),
+            (upper_diagram, "#f8961e", "Upper-level H0", 0.0),
+        ):
+            for birth, death in finite_intervals(intervals, endpoint):
+                barcode_ax.hlines(row, birth, death, color=color, linewidth=1.25)
+                row += 1
+            barcode_ax.plot([], [], color=color, label=label)
+            row += 1
+        barcode_ax.set_title("H0 persistence barcodes", fontweight="bold")
+        barcode_ax.set_xlabel("Filtration value")
+        barcode_ax.set_ylabel("Interval" if column_index == 0 else "")
+        barcode_ax.set_yticks([])
+        barcode_ax.grid(axis="x", alpha=0.25)
+        barcode_ax.legend(loc="best", fontsize=7.5)
+
+        curve_x = np.linspace(0.0, 1.0, curves.shape[1])
+        betti_ax.plot(curve_x, curves[0], color="#277da1", linewidth=1.35, label="Sublevel")
+        betti_ax.plot(curve_x, curves[1], color="#f8961e", linewidth=1.35, label="Upper-level")
+        betti_ax.set_title(f"Fixed-length PH: 2 x {curves.shape[1]}", fontweight="bold")
+        betti_ax.set_xlabel("Normalized filtration position")
+        betti_ax.set_ylabel("Alive H0 components" if column_index == 0 else "")
+        betti_ax.grid(alpha=0.25)
+        betti_ax.legend(loc="best", fontsize=7.5)
+
+    figure.suptitle(
+        f"Clean vs. NSTDB Noise: MIT-BIH Record {record_id}, annotation '{original_symbol}'\n"
+        f"AAMI CLASS {mapped_class}: {class_names.get(mapped_class, mapped_class)}",
+        fontsize=16,
+        fontweight="bold",
+    )
+    figure.text(
+        0.5,
+        0.018,
+        "Each column uses the same three-beat ECG context. PH is direct 1D H0: sublevel filtration captures valleys; "
+        "upper-level filtration is computed on -ECG and captures peaks. Barcodes display the 25 most persistent intervals per filtration.",
+        ha="center",
+        va="bottom",
+        fontsize=8.5,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=180, bbox_inches="tight")
     plt.close(figure)
