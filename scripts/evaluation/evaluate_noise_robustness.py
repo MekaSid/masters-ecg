@@ -19,13 +19,14 @@ import numpy as np
 import torch
 import wfdb
 from scipy.signal import resample
+from torch import nn
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.data.noise import compute_signal_power
-from src.models.betti_fusion_model import ZhangBettiFusionCNN
+from src.models.betti_fusion_model import DindinPHOnlyCNN, ZhangBettiFusionCNN
 from src.models.zhang_regular_cnn import ZhangRegularCNN, ZhangRegularCNNConfig
 from src.tda.betti import BettiCurveConfig, dindin_betti_curves
 from src.training.train import select_device
@@ -55,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate saved ECG and PH-fusion models under NSTDB noise.")
     parser.add_argument("--raw-checkpoint", type=Path, default=PROJECT_ROOT / "results/zhang_regular_cnn/zhang_regular_clean/zhang_regular_cnn.pt")
     parser.add_argument("--fusion-checkpoint", type=Path, default=PROJECT_ROOT / "results/dindin_betti/dindin_betti_clean/fusion.pt")
+    parser.add_argument("--ph-only-checkpoint", type=Path, default=None, help="Optional Dindin PH-only checkpoint for a three-model comparison.")
     parser.add_argument("--output-dir", type=Path, default=PROJECT_ROOT / "results/noise_robustness/quick_ds2")
     parser.add_argument("--snr-levels", nargs="+", type=float, default=[24.0, 12.0, 0.0, -6.0])
     parser.add_argument("--noise-conditions", nargs="+", choices=["bw", "ma", "em", "mix"], default=["bw", "ma", "em", "mix"])
@@ -157,23 +159,24 @@ def features_for_condition(
 
 @torch.no_grad()
 def evaluate_models(
-    raw_model: ZhangRegularCNN,
-    fusion_model: ZhangBettiFusionCNN,
+    models: dict[str, nn.Module],
     raw: np.ndarray,
     betti: np.ndarray,
     labels: np.ndarray,
     device: torch.device,
     batch_size: int,
 ) -> dict[str, dict[str, object]]:
-    raw_model.eval()
-    fusion_model.eval()
-    outputs: dict[str, list[np.ndarray]] = {"raw_only": [], "fusion": []}
+    for model in models.values():
+        model.eval()
+    outputs: dict[str, list[np.ndarray]] = {name: [] for name in models}
     for start in range(0, len(labels), batch_size):
         stop = start + batch_size
         raw_tensor = torch.from_numpy(raw[start:stop]).to(device)
         betti_tensor = torch.from_numpy(betti[start:stop]).to(device)
-        outputs["raw_only"].append(raw_model(raw_tensor).argmax(dim=1).cpu().numpy())
-        outputs["fusion"].append(fusion_model(raw_tensor, betti_tensor).argmax(dim=1).cpu().numpy())
+        outputs["raw_only"].append(models["raw_only"](raw_tensor).argmax(dim=1).cpu().numpy())
+        outputs["fusion"].append(models["fusion"](raw_tensor, betti_tensor).argmax(dim=1).cpu().numpy())
+        if "ph_only" in models:
+            outputs["ph_only"].append(models["ph_only"](betti_tensor).argmax(dim=1).cpu().numpy())
 
     results: dict[str, dict[str, object]] = {}
     for name, parts in outputs.items():
@@ -202,14 +205,21 @@ def evaluate_models(
     return results
 
 
-def load_models(raw_checkpoint: Path, fusion_checkpoint: Path, device: torch.device) -> tuple[ZhangRegularCNN, ZhangBettiFusionCNN]:
+def load_models(raw_checkpoint: Path, fusion_checkpoint: Path, ph_only_checkpoint: Path | None, device: torch.device) -> dict[str, nn.Module]:
     if not raw_checkpoint.is_file() or not fusion_checkpoint.is_file():
         raise FileNotFoundError("Both saved raw-only and fusion checkpoints are required.")
     raw_model = ZhangRegularCNN(ZhangRegularCNNConfig(num_classes=len(CLASS_NAMES)))
     fusion_model = ZhangBettiFusionCNN(num_classes=len(CLASS_NAMES))
     raw_model.load_state_dict(torch.load(raw_checkpoint, map_location="cpu", weights_only=True)["model_state_dict"])
     fusion_model.load_state_dict(torch.load(fusion_checkpoint, map_location="cpu", weights_only=True)["model_state_dict"])
-    return raw_model.to(device), fusion_model.to(device)
+    models: dict[str, nn.Module] = {"raw_only": raw_model.to(device), "fusion": fusion_model.to(device)}
+    if ph_only_checkpoint is not None:
+        if not ph_only_checkpoint.is_file():
+            raise FileNotFoundError(f"PH-only checkpoint not found: {ph_only_checkpoint}")
+        ph_only_model = DindinPHOnlyCNN(num_classes=len(CLASS_NAMES))
+        ph_only_model.load_state_dict(torch.load(ph_only_checkpoint, map_location="cpu", weights_only=True)["model_state_dict"])
+        models["ph_only"] = ph_only_model.to(device)
+    return models
 
 
 def main() -> None:
@@ -226,14 +236,14 @@ def main() -> None:
     if any(len(source) < max(len(example.ph_signal) for example in examples) for source in sources.values()):
         raise ValueError("NSTDB recordings are shorter than an ECG context.")
     device = select_device()
-    raw_model, fusion_model = load_models(args.raw_checkpoint, args.fusion_checkpoint, device)
+    models = load_models(args.raw_checkpoint, args.fusion_checkpoint, args.ph_only_checkpoint, device)
     output_dir = ensure_dir(args.output_dir)
     betti_config = BettiCurveConfig(resolution=int(config["betti_resolution"]))
     records: list[dict[str, object]] = []
     conditions: list[tuple[str, float | None]] = [("clean", None)] + [(condition, snr) for condition in args.noise_conditions for snr in args.snr_levels]
     for condition_index, (condition, snr_db) in enumerate(conditions):
         raw, betti, labels = features_for_condition(examples, sources, condition, snr_db, args.seed + condition_index * 10_000, betti_config)
-        metrics = evaluate_models(raw_model, fusion_model, raw, betti, labels, device, args.batch_size)
+        metrics = evaluate_models(models, raw, betti, labels, device, args.batch_size)
         record: dict[str, object] = {"condition": condition, "snr_db": snr_db, "models": metrics}
         records.append(record)
         print(f"{condition:>5} {str(snr_db):>5} dB | raw={metrics['raw_only']['accuracy']:.4f} | fusion={metrics['fusion']['accuracy']:.4f}", flush=True)
