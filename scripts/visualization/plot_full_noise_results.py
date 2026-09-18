@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_dashboard(records: list[dict], metric_key: str, ylabel: str, output_path: Path) -> None:
+def create_dashboard(records: list[dict], metric_key: str, ylabel: str, output_path: Path, seed_label: str) -> None:
     figure, axes = plt.subplots(2, 2, figsize=(14, 9), sharex=True)
     for axis, (condition, title) in zip(axes.flat, CONDITIONS.items()):
         points = sorted((record for record in records if record["condition"] == condition), key=lambda value: float(value["snr_db"]), reverse=True)
@@ -59,7 +59,7 @@ def create_dashboard(records: list[dict], metric_key: str, ylabel: str, output_p
         axis.set_xlabel("Target SNR (dB): 24 is light noise; -6 is severe noise")
     handles, labels = axes[0, 0].get_legend_handles_labels()
     figure.legend(handles, labels, loc="lower center", ncol=3, frameon=True)
-    figure.suptitle(f"Full MIT-BIH DS2 Robustness, Seed 42: {ylabel} vs. NSTDB Noise Level", fontsize=16, fontweight="bold")
+    figure.suptitle(f"Full MIT-BIH DS2 Robustness, {seed_label}: {ylabel} vs. NSTDB Noise Level", fontsize=16, fontweight="bold")
     figure.text(0.5, 0.075, "All 49,668 eligible DS2 contexts. Each Raw/PH-only/Fusion comparison uses the identical corrupted ECG realization.", ha="center", fontsize=9)
     figure.tight_layout(rect=(0, 0.12, 1, 0.94))
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,8 +75,9 @@ def main() -> None:
         payload = json.load(handle)
     output_dir = ensure_dir(args.output_dir or args.metrics_json.parent / "plots")
     records = payload["results"]
-    create_dashboard(records, "accuracy", "Classification accuracy (%)", output_dir / "accuracy_vs_snr_all_conditions.png")
-    create_dashboard(records, "macro_f1", "Macro-F1 (%)", output_dir / "macro_f1_vs_snr_all_conditions.png")
+    seed_label = args.metrics_json.parent.name.replace("full_ds2_", "").replace("_", " ").title()
+    create_dashboard(records, "accuracy", "Classification accuracy (%)", output_dir / "accuracy_vs_snr_all_conditions.png", seed_label)
+    create_dashboard(records, "macro_f1", "Macro-F1 (%)", output_dir / "macro_f1_vs_snr_all_conditions.png", seed_label)
     print(f"Saved robustness dashboards to {output_dir}")
 
 
