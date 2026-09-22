@@ -14,7 +14,9 @@ versions side by side: raw ECG context, persistence barcodes, and Betti curves.
 
 Each figure contains:
 
-1. The previous, central labeled, and following ECG beats from lead I.
+1. Three complete lead-I beats. The window runs from the midpoint before the
+   previous beat through the midpoint after the following beat; the central
+   beat supplies the sequence label.
 2. A sublevel-filtration snapshot, where the blue regions are samples with
    normalized amplitude less than or equal to the displayed threshold.
 3. GUDHI H0 sublevel and upper-level persistence barcodes. Upper-level PH is
@@ -25,3 +27,8 @@ Each figure contains:
 
 The saved `recreation_metadata.json` records the deterministic NSTDB segment
 starts and achieved SNRs. Output is written to ignored `results/dindin_recreation/`.
+
+The trained PH models currently use the earlier R-peak-to-R-peak context. This
+full-three-beat visual recreation does not alter their preprocessing or results;
+adopting it for the models requires retraining all three seeds and rerunning the
+noise experiments.

@@ -38,8 +38,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def choose_three_beat_context(record_id: str, symbol: str, occurrence: int) -> tuple[np.ndarray, int, int, list[int], str]:
-    """Return lead-I previous/current/following context centered on a selected symbol."""
+def choose_three_beat_context(record_id: str, symbol: str, occurrence: int) -> tuple[np.ndarray, int, list[int], list[int], int, str]:
+    """Return three full lead-I beats, with the central beat supplying the label."""
     record_path = PROJECT_ROOT / "data/raw/mitdb" / record_id
     record = wfdb.rdrecord(str(record_path))
     annotation = wfdb.rdann(str(record_path), "atr")
@@ -49,11 +49,17 @@ def choose_three_beat_context(record_id: str, symbol: str, occurrence: int) -> t
     annotation_index = indices[occurrence]
     valid_indices = [index for index, value in enumerate(annotation.symbol) if value in ZHANG_LABEL_MAP]
     position = valid_indices.index(annotation_index)
-    if position == 0 or position == len(valid_indices) - 1:
-        raise ValueError("Selected beat needs both a preceding and following mapped beat.")
+    if position < 2 or position > len(valid_indices) - 3:
+        raise ValueError("Selected beat needs two mapped beats before and after it for a full three-beat context.")
     previous, central, following = (int(annotation.sample[valid_indices[position + delta]]) for delta in (-1, 0, 1))
-    signal = np.asarray(record.p_signal[previous:following, 0], dtype=np.float32)
-    return signal, central - previous, int(record.fs), [0, central - previous, following - previous], ZHANG_LABEL_MAP[symbol]
+    before_previous = int(annotation.sample[valid_indices[position - 2]])
+    after_following = int(annotation.sample[valid_indices[position + 2]])
+    start = (before_previous + previous) // 2
+    end = (following + after_following) // 2
+    signal = np.asarray(record.p_signal[start:end, 0], dtype=np.float32)
+    r_offsets = [previous - start, central - start, following - start]
+    boundaries = [0, (previous + central) // 2 - start, (central + following) // 2 - start, len(signal)]
+    return signal, central - start, r_offsets, boundaries, int(record.fs), ZHANG_LABEL_MAP[symbol]
 
 
 def finite_intervals(diagram: np.ndarray, endpoint: float) -> np.ndarray:
@@ -78,6 +84,7 @@ def plot_example(
     waveform: np.ndarray,
     sampling_rate: int,
     r_offsets: list[int],
+    boundaries: list[int],
     normalized: np.ndarray,
     sublevel: np.ndarray,
     upper: np.ndarray,
@@ -94,14 +101,14 @@ def plot_example(
     betti_ax = figure.add_subplot(grid[2, :])
 
     time = np.arange(len(waveform)) / sampling_rate
-    regions = [(r_offsets[0], r_offsets[1], "Previous beat", "#e7f0f6"), (r_offsets[1], r_offsets[2], "Central labeled beat", "#fce8e6")]
+    regions = [(boundaries[0], boundaries[1], "Previous beat", "#e7f0f6"), (boundaries[1], boundaries[2], "Central labeled beat", "#fce8e6"), (boundaries[2], boundaries[3], "Following beat", "#eaf4e3")]
     for start, end, label, color in regions:
         waveform_ax.axvspan(start / sampling_rate, end / sampling_rate, color=color, alpha=0.8, label=label)
     waveform_ax.plot(time, waveform, color="#173f5f", linewidth=1.25, zorder=2)
     waveform_ax.scatter(r_offsets[1] / sampling_rate, waveform[r_offsets[1]], color="#c44536", edgecolor="white", s=65, zorder=3, label="Central R peak")
     waveform_ax.axvline(r_offsets[1] / sampling_rate, color="#c44536", linestyle="--", linewidth=0.9)
     waveform_ax.set_title("Input to Dindin PH: previous + central + following ECG beats", fontweight="bold")
-    waveform_ax.set_xlabel("Time from preceding R peak (seconds)")
+    waveform_ax.set_xlabel("Time from midpoint before previous beat (seconds)")
     waveform_ax.set_ylabel("ECG amplitude (mV)")
     waveform_ax.grid(alpha=0.25)
     waveform_ax.legend(loc="best", ncol=3, fontsize=8)
@@ -155,6 +162,7 @@ def plot_clean_noisy_comparison(
     noisy: np.ndarray,
     sampling_rate: int,
     r_offsets: list[int],
+    boundaries: list[int],
     clean_components: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     noisy_components: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     title: str,
@@ -166,8 +174,8 @@ def plot_clean_noisy_comparison(
 
     def waveform(axis: plt.Axes, signal: np.ndarray, label: str) -> None:
         time = np.arange(len(signal)) / sampling_rate
-        axis.axvspan(r_offsets[0] / sampling_rate, r_offsets[1] / sampling_rate, color="#e7f0f6", alpha=0.8, label="Previous -> central RR interval")
-        axis.axvspan(r_offsets[1] / sampling_rate, r_offsets[2] / sampling_rate, color="#fce8e6", alpha=0.8, label="Central -> following RR interval")
+        for start, end, color, region in ((boundaries[0], boundaries[1], "#e7f0f6", "Previous beat"), (boundaries[1], boundaries[2], "#fce8e6", "Central labeled beat"), (boundaries[2], boundaries[3], "#eaf4e3", "Following beat")):
+            axis.axvspan(start / sampling_rate, end / sampling_rate, color=color, alpha=0.8, label=region)
         axis.plot(time, signal, color=colors[label], linewidth=1.2)
         peak_indices = [0, r_offsets[1], len(signal) - 1]
         axis.scatter(
@@ -177,7 +185,7 @@ def plot_clean_noisy_comparison(
         )
         axis.axvline(r_offsets[1] / sampling_rate, color="#c44536", linestyle="--", linewidth=0.8)
         axis.set_title(f"{label.title()} ECG: three-beat PH input", fontweight="bold")
-        axis.set_xlabel("Time from preceding R peak (seconds)")
+        axis.set_xlabel("Time from midpoint before previous beat (seconds)")
         axis.set_ylabel("ECG amplitude (mV)")
         axis.grid(alpha=0.25)
         axis.legend(fontsize=7, loc="best")
@@ -228,12 +236,12 @@ def main() -> None:
     args = parse_args()
     if not np.isfinite(args.snr_db):
         raise ValueError("snr-db must be finite.")
-    waveform, central_offset, sampling_rate, r_offsets, mapped_class = choose_three_beat_context(args.record_id, args.symbol, args.occurrence)
+    waveform, central_offset, r_offsets, boundaries, sampling_rate, mapped_class = choose_three_beat_context(args.record_id, args.symbol, args.occurrence)
     output_dir = ensure_dir(args.output_dir)
     clean_components = components(waveform)
     normalized, sublevel, upper, curves = clean_components
     base_title = f"Dindin Direct-1D PH Recreation | MIT-BIH {args.record_id}, annotation '{args.symbol}' -> AAMI {mapped_class} ({CLASS_NAMES[mapped_class]})"
-    plot_example(waveform, sampling_rate, r_offsets, normalized, sublevel, upper, curves, f"{base_title} | Clean ECG", output_dir / "01_clean_dindin_ph.png")
+    plot_example(waveform, sampling_rate, r_offsets, boundaries, normalized, sublevel, upper, curves, f"{base_title} | Clean ECG", output_dir / "01_clean_dindin_ph.png")
 
     metadata: dict[str, object] = {"record_id": args.record_id, "original_symbol": args.symbol, "mapped_class": mapped_class, "snr_db_target": args.snr_db, "noise": {}}
     nstdb_dir = PROJECT_ROOT / "data/raw/nstdb"
@@ -242,10 +250,10 @@ def main() -> None:
         result = NoiseAugmentor(seed=args.seed + index).add_noise(waveform, noise, noise_type, args.snr_db)
         noisy_components = components(result.noisy)
         normalized, sublevel, upper, curves = noisy_components
-        plot_example(result.noisy, sampling_rate, r_offsets, normalized, sublevel, upper, curves,
+        plot_example(result.noisy, sampling_rate, r_offsets, boundaries, normalized, sublevel, upper, curves,
                      f"{base_title} | {NOISE_NAMES[noise_type]} at {result.snr_db_achieved:.1f} dB", output_dir / f"0{index + 2}_{noise_type}_{int(args.snr_db)}db_dindin_ph.png")
         plot_clean_noisy_comparison(
-            waveform, result.noisy, sampling_rate, r_offsets, clean_components, noisy_components,
+            waveform, result.noisy, sampling_rate, r_offsets, boundaries, clean_components, noisy_components,
             f"Clean vs. {NOISE_NAMES[noise_type]} at {result.snr_db_achieved:.1f} dB | {base_title}",
             output_dir / f"comparison_{noise_type}_{int(args.snr_db)}db.png",
         )
