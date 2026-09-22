@@ -144,7 +144,7 @@ def plot_example(
     figure.suptitle(title, fontsize=16, fontweight="bold")
     figure.text(0.5, 0.012, "At each filtration threshold, the Betti value counts barcode intervals alive at that threshold. "
                 "Barcodes shown are the 25 most persistent intervals; Betti curves use every valid interval.", ha="center", fontsize=8.5)
-    figure.tight_layout(rect=(0, 0.04, 1, 0.95))
+    figure.subplots_adjust(bottom=0.08, top=0.90)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output_path, dpi=180, bbox_inches="tight")
     plt.close(figure)
